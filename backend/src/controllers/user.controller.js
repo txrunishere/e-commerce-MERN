@@ -6,6 +6,7 @@ import {
   deleteFromCloudinary,
 } from "../utils/cloudinary.utility.js";
 import bcrypt from "bcrypt";
+import fs from "fs";
 
 const generateToken = async (userId) => {
   try {
@@ -18,7 +19,7 @@ const generateToken = async (userId) => {
 };
 
 const handleRegisterUser = asyncHandler(async (req, res) => {
-  const { name, email, password, city, state, country, street, area } =
+  const { name, email, password, city, state, country, street, area, role } =
     req.body;
 
   const userSchema = z.object({
@@ -34,6 +35,7 @@ const handleRegisterUser = asyncHandler(async (req, res) => {
     country: z.string().min(1, "Country is required"),
     street: z.string().min(1, "Street is required"),
     area: z.string().min(1, "Area is required"),
+    role: z.enum(["Seller", "Customer"]).default("Customer"),
   });
 
   const result = userSchema.safeParse({
@@ -45,9 +47,11 @@ const handleRegisterUser = asyncHandler(async (req, res) => {
     country,
     street,
     area,
+    role,
   });
 
   if (!result.success) {
+    fs.unlinkSync(req.file?.path);
     return res.status(400).json({
       error: result.error.errors.map((err) => err.message),
     });
@@ -55,6 +59,7 @@ const handleRegisterUser = asyncHandler(async (req, res) => {
 
   const isUserExists = await User.findOne({ email });
   if (isUserExists) {
+    fs.unlinkSync(req.file?.path);
     return res.status(400).json({
       error: "User already exists!",
     });
@@ -72,7 +77,7 @@ const handleRegisterUser = asyncHandler(async (req, res) => {
   let avatar;
 
   try {
-    console.log(avatar);
+    console.log("Avatar", avatar);
     avatar = await uploadOnCloudinary(avatarPath, process.env.AVATAR_FOLDER);
   } catch (error) {
     return res.status(500).json({
@@ -86,6 +91,7 @@ const handleRegisterUser = asyncHandler(async (req, res) => {
       email,
       password: hashedPassword,
       avatar: avatar.url,
+      role: role,
     });
 
     let setAddress = await User.findByIdAndUpdate(
@@ -107,10 +113,11 @@ const handleRegisterUser = asyncHandler(async (req, res) => {
     if (user && setAddress) {
       return res.status(201).json({
         message: `User ${name} register successfully!`,
-        name: user.name,
-        email: user.email,
-        avatar: user.avatar,
-        address: user.address,
+        name: setAddress.name,
+        email: setAddress.email,
+        avatar: setAddress.avatar,
+        address: setAddress.address,
+        role: setAddress.role,
       });
     } else {
       return res.status(400).json({
@@ -187,7 +194,7 @@ const handleLogoutUser = asyncHandler(async (req, res) => {
     .clearCookie("accessToken")
     .json({
       message: `User ${req.user.name} logout successfully`,
-    })
+    });
 });
 
 const handleGetUser = asyncHandler(async (req, res) => {

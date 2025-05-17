@@ -1,6 +1,6 @@
 import { Schema, model } from "mongoose";
 import bcrypt from "bcrypt";
-import jwt from 'jsonwebtoken'
+import jwt from "jsonwebtoken";
 
 const userSchema = new Schema(
   {
@@ -24,6 +24,11 @@ const userSchema = new Schema(
     avatar: {
       type: String,
       required: true,
+    },
+    role: {
+      type: String,
+      enum: ["Seller", "Customer"],
+      default: "Customer",
     },
     address: [
       {
@@ -53,14 +58,14 @@ userSchema.methods.isPasswordCorrect = async function (password) {
 userSchema.methods.generateAccessToken = async function () {
   return await jwt.sign(
     {
-      _id: this._id
+      _id: this._id,
     },
     process.env.ACCESS_TOKEN_SECRET,
     {
-      expiresIn: process.env.ACCESS_TOKEN_EXPIRY
+      expiresIn: process.env.ACCESS_TOKEN_EXPIRY,
     }
-  )
-}
+  );
+};
 
 const User = model("User", userSchema);
 
