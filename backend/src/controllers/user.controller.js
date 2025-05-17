@@ -77,8 +77,8 @@ const handleRegisterUser = asyncHandler(async (req, res) => {
   let avatar;
 
   try {
-    console.log("Avatar", avatar);
     avatar = await uploadOnCloudinary(avatarPath, process.env.AVATAR_FOLDER);
+    console.log("Avatar", avatar);
   } catch (error) {
     return res.status(500).json({
       error: "Avatar file not uploaded",
