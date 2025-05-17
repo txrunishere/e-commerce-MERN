@@ -1,8 +1,21 @@
 import asyncHandler from "express-async-handler";
 import { User } from "../models/user.model.js";
 import { z } from "zod";
-import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudinary.utility.js";
-import bcrypt from 'bcrypt'
+import {
+  uploadOnCloudinary,
+  deleteFromCloudinary,
+} from "../utils/cloudinary.utility.js";
+import bcrypt from "bcrypt";
+
+const generateToken = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+    const accessToken = await user.generateAccessToken();
+    return accessToken;
+  } catch (error) {
+    throw new Error("Error while generating access token");
+  }
+};
 
 const handleRegisterUser = asyncHandler(async (req, res) => {
   const { name, email, password, city, state, country, street, area } =
@@ -54,14 +67,13 @@ const handleRegisterUser = asyncHandler(async (req, res) => {
     });
   }
 
-  const hashedPassword = await bcrypt.hash(password, 12)
+  const hashedPassword = await bcrypt.hash(password, 12);
 
   let avatar;
 
   try {
     console.log(avatar);
     avatar = await uploadOnCloudinary(avatarPath, process.env.AVATAR_FOLDER);
-
   } catch (error) {
     return res.status(500).json({
       error: "Avatar file not uploaded",
@@ -74,7 +86,7 @@ const handleRegisterUser = asyncHandler(async (req, res) => {
       email,
       password: hashedPassword,
       avatar: avatar.url,
-    })
+    });
 
     let setAddress = await User.findByIdAndUpdate(
       user._id,
@@ -98,7 +110,7 @@ const handleRegisterUser = asyncHandler(async (req, res) => {
         name: user.name,
         email: user.email,
         avatar: user.avatar,
-        address: user.address
+        address: user.address,
       });
     } else {
       return res.status(400).json({
@@ -109,16 +121,79 @@ const handleRegisterUser = asyncHandler(async (req, res) => {
     console.log("Error while create user", error);
 
     if (avatar) {
-      await deleteFromCloudinary(avatar.public_id)
+      await deleteFromCloudinary(avatar.public_id);
     }
 
-    return res.status(500).json(
-      {
-        error: error.message || "Something wrong while register user"
-      }
-    )
+    return res.status(500).json({
+      error: error.message || "Something wrong while register user",
+    });
   }
-})
+});
 
+const handleLoginUser = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
 
-export { handleRegisterUser };
+  if (!email) {
+    return res.status(400).json({
+      error: "Email is required",
+    });
+  }
+
+  if (!password) {
+    return res.status(400).json({
+      error: "Password is required",
+    });
+  }
+
+  const user = await User.findOne({ email }).select("+password");
+
+  if (!user) {
+    return res.status(404).json({
+      error: "User not found",
+    });
+  }
+
+  const comparePassword = await user.isPasswordCorrect(password);
+
+  if (!comparePassword) {
+    return res.status(400).json({
+      error: "Incorrect Password",
+    });
+  }
+
+  const token = await generateToken(user._id);
+
+  if (user && token) {
+    return res
+      .status(200)
+      .cookie("accessToken", token, {
+        httpOnly: true,
+        secure: true,
+      })
+      .json({
+        message: `User ${user.name} Login Successfully`,
+        accessToken: token,
+      });
+  } else {
+    return res.status(500).json({
+      error: "Error while user login",
+    });
+  }
+});
+
+const handleLogoutUser = asyncHandler(async (req, res) => {
+  return res
+    .status(200)
+    .clearCookie("accessToken")
+    .json({
+      message: `User ${req.user.name} logout successfully`,
+    })
+});
+
+const handleGetUser = asyncHandler(async (req, res) => {
+  return res.status(200).json({
+    user: req.user,
+  });
+});
+
+export { handleRegisterUser, handleLoginUser, handleGetUser, handleLogoutUser };
