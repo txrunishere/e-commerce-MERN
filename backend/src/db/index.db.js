@@ -11,7 +11,7 @@ export const connectDB = async () => {
       mongoDBConnectionInstence.connection.name
     );
   } catch (error) {
-    console.log("Error while connect to mongoose");
+    console.log("Error while connect to mongoose", error);
     process.exit(1)
   }
 };
