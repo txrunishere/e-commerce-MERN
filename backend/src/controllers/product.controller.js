@@ -6,9 +6,24 @@ import {
   uploadOnCloudinary,
 } from "../utils/cloudinary.utility.js";
 import fs from "fs";
+import { isSeller } from "../helpers/permission.js";
 
 const handleUploadProduct = asyncHandler(async (req, res) => {
   const { name, description, price, stock, brand } = req.body;
+
+  const checkSeller = await isSeller(req.user._id);
+
+  if (!checkSeller) {
+    return res.status(400).json({
+      error: "Only Sellers can add their products",
+    });
+  }
+  const numericPrice = Number(price);
+  if (isNaN(numericPrice)) {
+    return res.status(400).json({
+      error: "Price must be a valid number",
+    });
+  }
 
   const validate = z.object({
     name: z.string().min(1, "Name is required"),
@@ -16,27 +31,30 @@ const handleUploadProduct = asyncHandler(async (req, res) => {
       .string()
       .min(1, "Description is required")
       .max(200, "Description not more than 200 characters"),
-    price: z.number().min(1, "Price must be at least 1"),
-    stock: z.enum([true, false]).default(false),
+    price: z
+      .number()
+      .min(9, "Product's price must be minimum 9 bucks")
+      .max(1000000, "Product's price must be maximun a million"),
+    stock: z.enum(["true", "false"]).default("false"),
     brand: z.string().min(1, "Brand is required"),
   });
 
   const { success, error } = validate.safeParse({
     name,
     description,
-    price,
+    price: numericPrice,
     stock,
     brand,
   });
-
+  // console.log(req.file);
   if (!success) {
-    fs.unlinkSync(req.file?.productImage);
-    return res.status(200).json({
+    fs.unlinkSync(req.file?.path);
+    return res.status(404).json({
       errors: error.errors.map((err) => err.message),
     });
   }
 
-  const productImagePath = req.file?.productImage;
+  const productImagePath = req.file?.path;
   if (!productImagePath) {
     return res.status(400).json({
       error: "Product Image is required!",
@@ -66,6 +84,8 @@ const handleUploadProduct = asyncHandler(async (req, res) => {
       brand,
       productImage: image.url,
     });
+
+    // console.log(typeof product.price);
 
     if (product) {
       return res.status(201).json({

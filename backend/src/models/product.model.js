@@ -16,7 +16,7 @@ const productSchema = new Schema(
       minlength: 10
     },
     price: Number,
-    stock: Boolean,
+    stock: String,
     productImage: String, // url
     brand: String,
   },
